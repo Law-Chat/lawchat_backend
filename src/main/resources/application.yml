@@ -1,0 +1,6 @@
+spring:
+  application:
+    name: lawchat_backend
+
+  profiles:
+    active: dev
