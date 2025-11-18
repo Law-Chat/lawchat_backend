@@ -16,14 +16,14 @@ import java.io.IOException;
 @Component
 public class OAuth2AuthenticationFailureHandler extends SimpleUrlAuthenticationFailureHandler {
 
-    @Value("${app.oauth2.authorized-redirect-uris}")
-    private String[] authorizedRedirectUris;
+    @Value("${app.oauth2.default-redirect-uri}")
+    private String defaultRedirectUri;
 
     @Override
     public void onAuthenticationFailure(HttpServletRequest request, HttpServletResponse response,
                                        AuthenticationException exception) throws IOException, ServletException {
-        String targetUrl = authorizedRedirectUris[0];
-
+        String targetUrl = defaultRedirectUri;
+        log.error(exception.getMessage(), exception);
         targetUrl = UriComponentsBuilder.fromUriString(targetUrl)
                 .queryParam("error", exception.getLocalizedMessage())
                 .build().toUriString();

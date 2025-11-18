@@ -1,5 +1,11 @@
 package com.lawchat.lawchat_backend.global.oauth2.handler;
 
+import com.lawchat.lawchat_backend.domain.user.entity.Role;
+import com.lawchat.lawchat_backend.domain.user.entity.User;
+import com.lawchat.lawchat_backend.domain.user.repository.UserRepository;
+import com.lawchat.lawchat_backend.global.oauth2.OAuth2Provider;
+import com.lawchat.lawchat_backend.global.oauth2.user.OAuth2UserInfo;
+import com.lawchat.lawchat_backend.global.oauth2.user.UserPrincipal;
 import com.lawchat.lawchat_backend.global.security.jwt.JwtTokenProvider;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -20,36 +26,72 @@ import java.io.IOException;
 public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationSuccessHandler {
 
     private final JwtTokenProvider tokenProvider;
+    private final UserRepository userRepository;
 
-    @Value("${app.oauth2.authorized-redirect-uris}")
-    private String[] authorizedRedirectUris;
+    @Value("${app.oauth2.default-redirect-uri}")
+    private String oauthRedirectUri;
 
     @Override
-    public void onAuthenticationSuccess(HttpServletRequest request, HttpServletResponse response,
-                                        Authentication authentication) throws IOException, ServletException {
-        String targetUrl = determineTargetUrl(request, response, authentication);
+    public void onAuthenticationSuccess(
+            HttpServletRequest request,
+            HttpServletResponse response,
+            Authentication authentication
+    ) throws IOException, ServletException {
+        log.info("=== OAuth2 Authentication Success Handler Started ===");
+
+        // ① UserPrincipal 추출
+        UserPrincipal userPrincipal = (UserPrincipal) authentication.getPrincipal();
+        OAuth2UserInfo oAuth2UserInfo = userPrincipal.getOAuth2UserInfo();
+
+        if (oAuth2UserInfo == null) {
+            log.error("OAuth2UserInfo is null");
+            throw new IllegalStateException("OAuth2UserInfo cannot be null");
+        }
+
+        String socialId = oAuth2UserInfo.getSocialId();
+        OAuth2Provider provider = oAuth2UserInfo.getProvider();
+        String email = oAuth2UserInfo.getEmail();
+        String name = oAuth2UserInfo.getName();
+
+        log.info("OAuth2 Login - provider: {}, email: {}", provider, email);
+
+        // ② 사용자 조회 또는 생성
+        User user = userRepository
+                .findBySocialProviderAndSocialId(provider, socialId)
+                .orElseGet(() -> {
+                    log.info("New user registration - email: {}", email);
+                    // 첫 로그인 -> 자동 회원가입
+                    User newUser = User.builder()
+                            .name(name)
+                            .email(email)
+                            .socialProvider(provider)
+                            .socialId(socialId)
+                            .role(Role.USER)
+                            .build();
+                    return userRepository.save(newUser);
+                });
+
+        // ③ JWT 액세스 토큰 발급 (24시간)
+        String accessToken = tokenProvider.generateToken(user);
+
+        // ④ Flutter Deep Link로 리다이렉트
+        String targetUrl = getRedirectUrl(oauthRedirectUri, accessToken);
 
         if (response.isCommitted()) {
-            log.debug("Response has already been committed. Unable to redirect to " + targetUrl);
+            log.error("Response has already been committed");
             return;
         }
 
-        clearAuthenticationAttributes(request);
+        log.info("Redirecting to: {}", targetUrl);
         getRedirectStrategy().sendRedirect(request, response, targetUrl);
+        log.info("=== OAuth2 Authentication Success Handler Completed ===");
     }
 
-    protected String determineTargetUrl(HttpServletRequest request, HttpServletResponse response,
-                                       Authentication authentication) {
-        // 개발 환경에서는 백엔드 URL 사용 (authorizedRedirectUris[1])
-        // 프로덕션에서는 프론트엔드 URL 사용 (authorizedRedirectUris[0])
-        String targetUrl = authorizedRedirectUris.length > 1 ? authorizedRedirectUris[1] : authorizedRedirectUris[0];
-
-        String token = tokenProvider.generateToken(authentication);
-
-        log.info("OAuth2 Login Success - Redirecting to: {} with token", targetUrl);
-
-        return UriComponentsBuilder.fromUriString(targetUrl)
+    private String getRedirectUrl(String targetUrl, String token) {
+        return UriComponentsBuilder
+                .fromUriString(targetUrl)
                 .queryParam("token", token)
-                .build().toUriString();
+                .build()
+                .toUriString();
     }
 }
