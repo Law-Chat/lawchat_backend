@@ -56,26 +56,35 @@ public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationS
         log.info("OAuth2 Login - provider: {}, email: {}", provider, email);
 
         // ② 사용자 조회 또는 생성
-        User user = userRepository
-                .findBySocialProviderAndSocialId(provider, socialId)
-                .orElseGet(() -> {
-                    log.info("New user registration - email: {}", email);
-                    // 첫 로그인 -> 자동 회원가입
-                    User newUser = User.builder()
-                            .name(name)
-                            .email(email)
-                            .socialProvider(provider)
-                            .socialId(socialId)
-                            .role(Role.USER)
-                            .build();
-                    return userRepository.save(newUser);
-                });
+        User user;
+        boolean isNewUser;
+
+        var existingUser = userRepository.findBySocialProviderAndSocialId(provider, socialId);
+
+        if (existingUser.isPresent()) {
+            // 기존 회원
+            user = existingUser.get();
+            isNewUser = false;
+            log.info("Existing user login - email: {}", email);
+        } else {
+            // 신규 회원 자동 가입
+            log.info("New user registration - email: {}", email);
+            user = User.builder()
+                    .name(name)
+                    .email(email)
+                    .socialProvider(provider)
+                    .socialId(socialId)
+                    .role(Role.USER)
+                    .build();
+            user = userRepository.save(user);
+            isNewUser = true;
+        }
 
         // ③ JWT 액세스 토큰 발급 (24시간)
         String accessToken = tokenProvider.generateToken(user);
 
         // ④ Flutter Deep Link로 리다이렉트
-        String targetUrl = getRedirectUrl(oauthRedirectUri, accessToken);
+        String targetUrl = getRedirectUrl(oauthRedirectUri, accessToken, isNewUser);
 
         if (response.isCommitted()) {
             log.error("Response has already been committed");
@@ -87,11 +96,16 @@ public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationS
         log.info("=== OAuth2 Authentication Success Handler Completed ===");
     }
 
-    private String getRedirectUrl(String targetUrl, String token) {
-        return UriComponentsBuilder
+    private String getRedirectUrl(String targetUrl, String token, boolean isNewUser) {
+        UriComponentsBuilder builder = UriComponentsBuilder
                 .fromUriString(targetUrl)
-                .queryParam("token", token)
-                .build()
-                .toUriString();
+                .queryParam("token", token);
+
+        // 신규 가입인 경우에만 isNewUser 파라미터 추가
+        if (isNewUser) {
+            builder.queryParam("isNewUser", true);
+        }
+
+        return builder.build().toUriString();
     }
 }
