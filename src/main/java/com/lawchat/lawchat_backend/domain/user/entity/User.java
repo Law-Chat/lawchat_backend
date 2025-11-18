@@ -1,6 +1,7 @@
 package com.lawchat.lawchat_backend.domain.user.entity;
 
 import com.lawchat.lawchat_backend.global.common.BaseTimeEntity;
+import com.lawchat.lawchat_backend.global.oauth2.OAuth2Provider;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -27,9 +28,10 @@ public class User extends BaseTimeEntity {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private AuthProvider provider;
+    private OAuth2Provider socialProvider;  // OAuth2Provider enum 사용
 
-    private String providerId;
+    @Column(nullable = false)
+    private String socialId;  // providerId -> socialId로 변경
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
