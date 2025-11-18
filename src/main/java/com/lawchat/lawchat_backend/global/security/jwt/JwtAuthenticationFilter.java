@@ -35,11 +35,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
             if (StringUtils.hasText(jwt) && tokenProvider.validateToken(jwt)) {
                 Long userId = tokenProvider.getUserIdFromToken(jwt);
+                log.debug("Valid JWT for user ID: {}", userId);
 
                 User user = userRepository.findById(userId)
                         .orElseThrow(() -> new UserNotFoundException("User not found with id: " + userId));
 
-                UserPrincipal userPrincipal = UserPrincipal.create(user);
+                UserPrincipal userPrincipal = UserPrincipal.fromEntity(user);
                 UsernamePasswordAuthenticationToken authentication =
                         new UsernamePasswordAuthenticationToken(userPrincipal, null, userPrincipal.getAuthorities());
                 authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
