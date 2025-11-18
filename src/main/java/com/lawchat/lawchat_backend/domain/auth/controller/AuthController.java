@@ -29,7 +29,7 @@ public class AuthController {
     @SecurityRequirement(name = "JWT")
     public ResponseEntity<UserResponse> getCurrentUser(
             @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal userPrincipal) {
-        User user = userRepository.findById(userPrincipal.getId())
+        User user = userRepository.findById(userPrincipal.getUserId())
                 .orElseThrow(UserNotFoundException::new);
 
         return ResponseEntity.ok(UserResponse.from(user));
