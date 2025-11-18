@@ -1,8 +1,10 @@
 package com.lawchat.lawchat_backend.global.oauth2.user;
 
 import com.lawchat.lawchat_backend.domain.user.entity.User;
-import lombok.AllArgsConstructor;
+import com.lawchat.lawchat_backend.global.oauth2.OAuth2Provider;
+import lombok.AccessLevel;
 import lombok.Getter;
+import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -11,41 +13,51 @@ import org.springframework.security.oauth2.core.user.OAuth2User;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Map;
+import java.util.Optional;
 
-@Getter
-@AllArgsConstructor
-public class UserPrincipal implements OAuth2User, UserDetails {
+@RequiredArgsConstructor(access = AccessLevel.PRIVATE)
+public class UserPrincipal implements UserDetails, OAuth2User {
 
-    private Long id;
-    private String email;
-    private String password;
-    private Collection<? extends GrantedAuthority> authorities;
-    private Map<String, Object> attributes;
+    @Getter
+    private final Long userId;
 
-    public static UserPrincipal create(User user) {
+    private final String email;
+
+    @Getter
+    private final OAuth2UserInfo oAuth2UserInfo;
+
+    @Getter
+    private final Map<String, Object> attributes;
+
+    // OAuth2 로그인 시 생성 (소셜 로그인 중)
+    public static UserPrincipal fromOAuth2UserInfo(OAuth2UserInfo oAuth2UserInfo) {
         return new UserPrincipal(
-                user.getId(),
-                user.getEmail(),
-                null,
-                Collections.singletonList(new SimpleGrantedAuthority(user.getRole().getKey())),
-                null
+                null,  // userId는 아직 모름
+                oAuth2UserInfo.getEmail(),
+                oAuth2UserInfo,
+                oAuth2UserInfo.getAttributes()
         );
     }
 
-    public static UserPrincipal create(User user, Map<String, Object> attributes) {
-        UserPrincipal userPrincipal = create(user);
+    // DB 엔티티에서 생성 (JWT 인증 시)
+    public static UserPrincipal fromEntity(User user) {
         return new UserPrincipal(
-                userPrincipal.getId(),
-                userPrincipal.getEmail(),
-                userPrincipal.getPassword(),
-                userPrincipal.getAuthorities(),
-                attributes
+                user.getId(),
+                user.getEmail(),
+                null,  // OAuth2 정보 불필요
+                Map.of()
         );
+    }
+
+    // UserDetails 구현
+    @Override
+    public Collection<? extends GrantedAuthority> getAuthorities() {
+        return Collections.singletonList(new SimpleGrantedAuthority("ROLE_USER"));
     }
 
     @Override
     public String getPassword() {
-        return password;
+        return "";  // 소셜 로그인이므로 비밀번호 없음
     }
 
     @Override
@@ -73,18 +85,18 @@ public class UserPrincipal implements OAuth2User, UserDetails {
         return true;
     }
 
-    @Override
-    public Map<String, Object> getAttributes() {
-        return attributes;
-    }
-
-    @Override
-    public Collection<? extends GrantedAuthority> getAuthorities() {
-        return authorities;
-    }
-
+    // OAuth2User 구현
     @Override
     public String getName() {
-        return String.valueOf(id);
+        return Optional.ofNullable(oAuth2UserInfo)
+                .map(OAuth2UserInfo::getName)
+                .orElse("");
+    }
+
+    // 헬퍼 메서드
+    public OAuth2Provider getOAuth2Provider() {
+        return Optional.ofNullable(oAuth2UserInfo)
+                .map(OAuth2UserInfo::getProvider)
+                .orElse(null);
     }
 }

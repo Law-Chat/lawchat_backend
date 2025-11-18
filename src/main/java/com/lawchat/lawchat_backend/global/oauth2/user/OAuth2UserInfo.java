@@ -1,20 +1,16 @@
 package com.lawchat.lawchat_backend.global.oauth2.user;
 
+import com.lawchat.lawchat_backend.global.oauth2.OAuth2Provider;
+
 import java.util.Map;
 
-public abstract class OAuth2UserInfo {
+public interface OAuth2UserInfo {
+    String getEmail();
+    String getName();
+    OAuth2Provider getProvider();
+    String getSocialId();
+    Map<String, Object> getAttributes();
 
-    protected Map<String, Object> attributes;
-
-    public OAuth2UserInfo(Map<String, Object> attributes) {
-        this.attributes = attributes;
-    }
-
-    public abstract String getId();
-
-    public abstract String getName();
-
-    public abstract String getEmail();
-
-    public abstract String getImageUrl();
+    String FALLBACK_EMAIL = "no-email@lawchat.com";
+    String FALLBACK_NAME = "Unknown";
 }

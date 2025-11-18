@@ -1,30 +1,35 @@
 package com.lawchat.lawchat_backend.global.oauth2.user;
 
+import com.lawchat.lawchat_backend.global.oauth2.OAuth2Provider;
+import lombok.Getter;
+import lombok.RequiredArgsConstructor;
+
 import java.util.Map;
 
-public class GoogleOAuth2UserInfo extends OAuth2UserInfo {
-
-    public GoogleOAuth2UserInfo(Map<String, Object> attributes) {
-        super(attributes);
-    }
+@Getter
+@RequiredArgsConstructor(staticName = "from")
+public class GoogleOAuth2UserInfo implements OAuth2UserInfo {
+    private final Map<String, Object> attributes;
 
     @Override
-    public String getId() {
-        return (String) attributes.get("sub");
+    public String getEmail() {
+        String email = (String) attributes.get("email");
+        return email != null ? email : FALLBACK_EMAIL;
     }
 
     @Override
     public String getName() {
-        return (String) attributes.get("name");
+        String name = (String) attributes.get("name");
+        return name != null ? name : FALLBACK_NAME;
     }
 
     @Override
-    public String getEmail() {
-        return (String) attributes.get("email");
+    public OAuth2Provider getProvider() {
+        return OAuth2Provider.GOOGLE;
     }
 
     @Override
-    public String getImageUrl() {
-        return (String) attributes.get("picture");
+    public String getSocialId() {
+        return (String) attributes.get("sub");
     }
 }
