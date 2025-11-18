@@ -35,3 +35,9 @@ out/
 
 ### VS Code ###
 .vscode/
+
+### Documentation ###
+docs/
+
+### Claude Code ###
+.claude/
